@@ -8,14 +8,17 @@ class ChatRoom {
 	}
 
     setMessage(message) {
-        if(this.messages.length > 500) {
-            let length = this.messages.length;
-            let newer = this.messages.slice(Math.floor(length/2), length);
-            this.messages = [...newer, message];
-            this.io.in(this.room).emit(Events.receive_message, message);
-        } else {
-            this.messages = [...this.messages, message];
-            this.io.in(this.room).emit(Events.receive_message, message);
+        if(message.message.length > 0) {
+            if(this.messages.length > 500) {
+                this.io.in(this.room).emit(Events.receive_message, message);
+                let length = this.messages.length;
+                let newer = this.messages.slice(Math.floor(length/2), length);
+                this.messages = newer;
+                this.message.push(message);
+            } else {
+                this.io.in(this.room).emit(Events.receive_message, message);
+                this.messages.push(message);
+            }
         }
     }
     getMessages() {
