@@ -17,8 +17,8 @@ app.get("/", (req, res) => {
 const server = http.createServer(app);
 const io = socketIO(server);
 
-const rooms = io.of("/").adapter.rooms; // Map<SocketID, Set<Room>>
-const sids = io.of("/").adapter.sids; // Map<Room, Set<SocketID>>
+const rooms = io.of("/").adapter.rooms; // Map<Room, Set<Room>>
+const sids = io.of("/").adapter.sids; // Map<SocketID, Set<SocketID>>
 
 let chatRooms = new Map(); // Map<RoomID, ChatRoom>
 
@@ -54,6 +54,10 @@ io.on('connection', socket => {
         })
     });
 
+    socket.on(Events.leave_room, (room, callback) => {
+        socket.leave(room);
+        callback({ status:'ok'})
+    })
     socket.on(Events.send_message, (room, id, text) => {
         let message = new Message(room, id, text);
         chatRooms.get(room).setMessage(message);
@@ -62,6 +66,26 @@ io.on('connection', socket => {
     socket.on(Events.typing, (room, id) => {
         socket.to(room).emit(Events.typing, id);
     })
+
+    socket.on(Events.add_to_queue, (room, videoId) => {
+        chatRooms.get(room).addToQueue(videoId);
+    })
+    socket.on(Events.player_play, (room, currentTime) => {
+        chatRooms.get(room).playVideo(currentTime);
+    })
+    socket.on(Events.player_pause, (room) => {
+        chatRooms.get(room).pauseVideo();
+    })
+});
+
+io.of("/").adapter.on("leave-room", (room, id) => {
+    // If socket leaves a room, check if it has any people in it. 
+    // If not, delete the room.
+    const currRoom = rooms.get(room);
+    if(currRoom.size === 0 && chatRooms.has(room)) {
+        chatRooms.delete(room);
+    }
+    log(currRoom);
 });
 
 server.listen(port, () => {

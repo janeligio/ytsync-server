@@ -5,8 +5,20 @@ class ChatRoom {
         this.room = room;
         this.io = io;
         this.messages = [];
+        this.queue = [];
 	}
-
+    addToQueue(videoId) {
+        if(videoId.length > 0) {
+            this.io.in(this.room).emit(Events.add_to_queue, this.room, videoId);
+            this.queue.push(videoId);
+        }
+    }
+    playVideo(currentTime) {
+        this.io.in(this.room).emit(Events.player_play, this.room, currentTime);
+    }
+    pauseVideo() {
+        this.io.in(this.room).emit(Events.player_pause, this.room);
+    }
     setMessage(message) {
         if(message.message.length > 0) {
             if(this.messages.length > 500) {
