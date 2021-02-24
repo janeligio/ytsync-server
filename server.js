@@ -17,8 +17,8 @@ app.get("/", (req, res) => {
 const server = http.createServer(app);
 const io = socketIO(server);
 
-const rooms = io.of("/").adapter.rooms; // Map<Room, Set<Room>>
-const sids = io.of("/").adapter.sids; // Map<SocketID, Set<SocketID>>
+const rooms = io.of("/").adapter.rooms; // Map<Room, Set<SocketID>>
+const sids = io.of("/").adapter.sids; // Map<SocketID, Set<Room>>
 
 let chatRooms = new Map(); // Map<RoomID, ChatRoom>
 
@@ -48,18 +48,17 @@ io.on('connection', socket => {
 
     socket.on(Events.join_room, (room, id, callback) => {
         let roomExists = chatRooms.has(room);
+        let status;
+        let errors = '';
+
         if(roomExists) {
             socket.join(room);
+            status = 'ok';
             chatRooms.get(room).setMessage(new Message(room, id, `Welcome #${id}`));
             const chatHistory = chatRooms.get(room).getMessages();	// Get the chat rooms messages
             if(chatHistory.length > 0) {
                 socket.emit(Events.receive_all_messages, chatHistory);	// Send the messages to that socket
             }
-        }
-        let status;
-        let errors = '';
-        if(rooms.get(room).has(socket.id)) {
-            status =  'ok';
         } else {
             status = 'bad';
             errors += 'Room does not exist.';
