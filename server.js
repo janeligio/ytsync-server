@@ -27,19 +27,15 @@ io.on('connection', socket => {
     
     socket.emit(Events.assign_id, randomId(4));
 
-    socket.on(Events.join_room, (room, id, callback) => {
-        if(chatRooms.get(room)) {// If room exists join the room and get its messages
-            socket.join(room);
-            chatRooms.get(room).setMessage(new Message(room, id, `Welcome #${id}`));
-            const history = chatRooms.get(room).getMessages();	// Get the chat rooms messages
-            socket.emit(Events.receive_all_messages, history);	// Send the messages to that socket
-        } else { // If the room doesn't exist make one and join that room
-            chatRooms.set(room, new ChatRoom(room, io));
+    socket.on(Events.create_room, (id, callback) => {
+        const roomId = randomId(4);
+        const roomExists = chatRooms.has(roomId);
+        if(!roomExists) {
+            chatRooms.set(roomId, new ChatRoom(roomId, io));
             log('New chatroom');
             let socketRooms = sids.get(socket.id);
             if(socketRooms.has(socket.id) && socketRooms.size === 1) { // Not in any rooms
-                socket.join(room);
-                chatRooms.get(room).setMessage(new Message(room, id, `Welcome #${id}`));
+                socket.join(roomId);
             } else { // Remove from other rooms
                 const roomToLeave = [...socketRooms][1];
                 socket.leave(roomToLeave);
@@ -47,17 +43,35 @@ io.on('connection', socket => {
                 socket.join(room);
             }
         }
-        
-        callback({
-            status:'ok',
-            room:room
-        })
+        callback({ status:'ok', room:roomId });
+    })
+
+    socket.on(Events.join_room, (room, id, callback) => {
+        let roomExists = chatRooms.has(room);
+        if(roomExists) {
+            socket.join(room);
+            chatRooms.get(room).setMessage(new Message(room, id, `Welcome #${id}`));
+            const chatHistory = chatRooms.get(room).getMessages();	// Get the chat rooms messages
+            if(chatHistory.length > 0) {
+                socket.emit(Events.receive_all_messages, chatHistory);	// Send the messages to that socket
+            }
+        }
+        let status;
+        let errors = '';
+        if(rooms.get(room).has(socket.id)) {
+            status =  'ok';
+        } else {
+            status = 'bad';
+            errors += 'Room does not exist.';
+        }
+        callback({ status, room, errors });
     });
 
     socket.on(Events.leave_room, (room, callback) => {
         socket.leave(room);
         callback({ status:'ok'})
     })
+
     socket.on(Events.send_message, (room, id, text) => {
         let message = new Message(room, id, text);
         chatRooms.get(room).setMessage(message);
@@ -84,6 +98,7 @@ io.of("/").adapter.on("leave-room", (room, id) => {
     const currRoom = rooms.get(room);
     if(currRoom.size === 0 && chatRooms.has(room)) {
         chatRooms.delete(room);
+        log('deleting chatroom')
     }
     log(currRoom);
 });
