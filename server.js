@@ -1,7 +1,7 @@
 const express = require('express');
 const http = require('http');
 const socketIO = require('socket.io');
-const { randomId } = require('./utility/utility');
+const { randomId, generateAlias } = require('./utility/utility');
 const Events = require('./events/events');
 const ChatRoom = require('./Models/ChatRoom');
 const Message = require('./Models/Message');
@@ -21,11 +21,13 @@ const rooms = io.of("/").adapter.rooms; // Map<Room, Set<SocketID>>
 const sids = io.of("/").adapter.sids; // Map<SocketID, Set<Room>>
 
 let chatRooms = new Map(); // Map<RoomID, ChatRoom>
+let aliases = new Map(); // Map<SocketID, Alias>
 
 io.on('connection', socket => {
     log(`socket#${socket.id} connected.`)
-    
-    socket.emit(Events.assign_id, randomId(4));
+    const alias = generateAlias();
+    socket.emit(Events.assign_id, alias);
+    aliases.set(socket.id, alias);
 
     socket.on(Events.create_room, (id, callback) => {
         const roomId = randomId(4);
@@ -54,7 +56,7 @@ io.on('connection', socket => {
         if(roomExists) {
             socket.join(room);
             status = 'ok';
-            chatRooms.get(room).setMessage(new Message(room, id, `Welcome #${id}`));
+            chatRooms.get(room).setMessage(new Message(room, id, `${id} has joined the room.`, 'welcome'));
             const chatHistory = chatRooms.get(room).getMessages();	// Get the chat rooms messages
             if(chatHistory.length > 0) {
                 socket.emit(Events.receive_all_messages, chatHistory);	// Send the messages to that socket
@@ -72,7 +74,7 @@ io.on('connection', socket => {
     })
 
     socket.on(Events.send_message, (room, id, text) => {
-        let message = new Message(room, id, text);
+        let message = new Message(room, id, text, 'chat');
         chatRooms.get(room).setMessage(message);
     });
 
@@ -98,6 +100,10 @@ io.of("/").adapter.on("leave-room", (room, id) => {
     if(currRoom.size === 0 && chatRooms.has(room)) {
         chatRooms.delete(room);
         log('deleting chatroom')
+    } else if(chatRooms.has(room)) {
+        const alias = aliases.get(id);
+        const fairwellMessage = new Message(room, '', `${alias} has left the room.`, 'fairwell');
+        chatRooms.get(room).setMessage(fairwellMessage);
     }
     log(currRoom);
 });
