@@ -1,18 +1,36 @@
 const express = require('express');
+const cors = require('cors');
 const http = require('http');
 const socketIO = require('socket.io');
-const { randomId, generateAlias } = require('./utility/utility');
+const axios = require('axios');
+const { randomId, generateAlias, parseURL } = require('./utility/utility');
 const Events = require('./events/events');
 const ChatRoom = require('./Models/ChatRoom');
 const Message = require('./Models/Message');
+const API_KEY = require('./apiKey');
 const { log } = console;
 const port = process.env.PORT || 8080;
 
 const app = express();
+app.use(cors());
 
 app.get("/", (req, res) => {
     res.send({ response: "I am alive" }).status(200);
 });
+
+app.get("/video/:videoId", (req, res) => {
+    const {videoId} = req.params;
+    const requestURL = `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${API_KEY}`;
+    axios({
+        method:'get',
+        url: requestURL
+    }).then(response => {
+        const { snippet } = response.data.items[0];
+        const { title, thumbnails, channelTitle } = snippet;
+        res.json({title, thumbnails, channelTitle});
+    }).catch(e => log(e))
+
+})
 
 const server = http.createServer(app);
 const io = socketIO(server);
@@ -58,9 +76,13 @@ io.on('connection', socket => {
             status = 'ok';
             chatRooms.get(room).setMessage(new Message(room, id, `${id} has joined the room.`, 'welcome'));
             const chatHistory = chatRooms.get(room).getMessages();	// Get the chat rooms messages
+            const queue = chatRooms.get(room).getQueue();
+            const currentVideo = chatRooms.get(room).getCurrentVideo();
             if(chatHistory.length > 0) {
                 socket.emit(Events.receive_all_messages, chatHistory);	// Send the messages to that socket
             }
+            socket.emit(Events.get_queue, queue);
+            socket.emit(Events.get_current_video, currentVideo);
         } else {
             status = 'bad';
             errors += 'Room does not exist.';
@@ -83,13 +105,32 @@ io.on('connection', socket => {
     })
 
     socket.on(Events.add_to_queue, (room, videoId) => {
+        log('add to queue event');
         chatRooms.get(room).addToQueue(videoId);
     })
-    socket.on(Events.player_play, (room, currentTime) => {
+    socket.on(Events.player_play, (room, currentTime, playerState) => {
         chatRooms.get(room).playVideo(currentTime);
+        chatRooms.get(room).setCurrentTime(currentTime);
+        chatRooms.get(room).setPlayerState(playerState);
     })
-    socket.on(Events.player_pause, (room) => {
+    socket.on(Events.player_pause, (room, playerState, currentTime) => {
         chatRooms.get(room).pauseVideo();
+        chatRooms.get(room).setCurrentTime(currentTime);
+        chatRooms.get(room).setPlayerState(playerState);
+    })
+    socket.on('player play video', videoId => {
+        log(`videoId: ${videoId}`);
+    })
+    socket.on(Events.player_get_status, (room, callback) => {
+        const playerState = chatRooms.get(room).getPlayerState();
+        const currentTime = chatRooms.get(room).getCurrentTime();
+        callback({ state: playerState, currentTime});
+    })
+    socket.on('player set current time', (room, currentTime) => {
+        const chatRoom = chatRooms.get(room);
+        if(chatRoom) {
+            chatRoom.setCurrentTime(currentTime);
+        }
     })
 });
 

@@ -8,6 +8,16 @@ function randomId(length) {
 	return id;
 }
 
+function parseURL(URL) {
+    // const pattern =/^.*(youtu.be\/|v\/|e\/|u\/\w+\/|embed\/|v=)([^#\&\?]*).*/;
+    const pattern =/^.*(youtu.be\/|v\/|e\/|u\/\w+\/|embed\/|v=)([^#&?]*).*/;
+    let matches = URL.match(pattern);
+    let videoId = '';
+    if(matches && matches.length === 3) {
+        videoId = matches.pop();
+    }
+    return videoId;
+}
 
 function generateAlias() {
 	let randomColorIndex = Math.floor(Math.random() * Math.floor(COLORS.length));
@@ -790,4 +800,4 @@ const ANIMALS = [
 	"Zonkey",
 	"Zorse"
 ];
-module.exports = { log, randomId, generateAlias };
+module.exports = { log, randomId, generateAlias, parseURL };
