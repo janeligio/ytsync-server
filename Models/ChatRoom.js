@@ -42,7 +42,7 @@ class ChatRoom {
         this.playerState = 1;
     }
     pauseVideo() {
-        this.io.in(this.room).emit(Events.player_pause, this.room);
+        this.io.in(this.room).emit(Events.player_pause, this.room, this.playerState, this.currentTime);
         this.playerState = 2;
     }
     setMessage(message) {
