@@ -10,6 +10,7 @@ class ChatRoom {
         this.currentVideo = 0;
         this.currentTime = 0;
         this.playerState = -1; // domain: [-1, 0, 1, 2, 3, 5]
+        this.interval = null;
 	}
 
     addToQueue(videoId) {
@@ -53,6 +54,14 @@ class ChatRoom {
             playerState: this.playerState,
         }
         socket.to(this.room).emit(Events.player_play_at, data);
+
+        if(this.interval) {
+            clearInterval(this.interval);
+        }
+        this.interval = setInterval(() => {
+            log(`Setting current time to ${this.currentTime+2}`)
+            this.currentTime = this.currentTime + 2;
+        }, 2000);
     }
     pauseVideo(socket, playerState) {
         this.playerState = playerState;
