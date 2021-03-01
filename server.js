@@ -7,15 +7,17 @@ const { randomId, generateAlias, parseURL } = require('./utility/utility');
 const Events = require('./events/events');
 const ChatRoom = require('./Models/ChatRoom');
 const Message = require('./Models/Message');
-const API_KEY = require('./apiKey');
 const { log } = console;
+
 const port = process.env.PORT || 8080;
+const API_KEY = process.env.API_KEY;// = require('./apiKey');
+
 
 const app = express();
 app.use(cors());
 
 app.get("/", (req, res) => {
-    res.send({ response: "I am alive" }).status(200);
+    res.json({ response: "I am alive" });
 });
 
 app.get("/video/:videoId", (req, res) => {
