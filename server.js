@@ -10,11 +10,38 @@ const Message = require('./Models/Message');
 const { log } = console;
 
 const port = process.env.PORT || 8080;
-const API_KEY = process.env.API_KEY;// = require('./apiKey');
+let API_KEY;  
+
+let app;
+let server;
+let io;
+
+if (process.env.NODE_ENV === 'production') {
+    API_KEY = process.env.API_KEY;
+    app = express();
+    app.use(cors());
+    server = http.createServer(app);
+    io = socketIO(server, {
+        cors: {
+          origin: "https://modest-benz-608ea8.netlify.app",
+          methods: ["GET", "POST"]
+        }
+      });
+} else {
+    log(`NODE_ENV = ${process.env.NODE_ENV}`)
+    API_KEY = require('./apiKey');
+    app = express();
+    app.use(cors());
+    server = http.createServer(app);
+    io = socketIO(server, {
+        cors: {
+          origin: "http://localhost:3000",
+          methods: ["GET", "POST"]
+        }
+      });
+}
 
 
-const app = express();
-app.use(cors());
 
 app.get("/", (req, res) => {
     res.json({ response: "I am alive" });
@@ -34,8 +61,7 @@ app.get("/video/:videoId", (req, res) => {
 
 })
 
-const server = http.createServer(app);
-const io = socketIO(server);
+
 
 const rooms = io.of("/").adapter.rooms; // Map<Room, Set<SocketID>>
 const sids = io.of("/").adapter.sids; // Map<SocketID, Set<Room>>
