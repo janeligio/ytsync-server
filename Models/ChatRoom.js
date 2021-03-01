@@ -54,14 +54,6 @@ class ChatRoom {
             playerState: this.playerState,
         }
         socket.to(this.room).emit(Events.player_play_at, data);
-
-        if(this.interval) {
-            clearInterval(this.interval);
-        }
-        this.interval = setInterval(() => {
-            log(`Setting current time to ${this.currentTime+2}`)
-            this.currentTime = this.currentTime + 2;
-        }, 2000);
     }
     pauseVideo(socket, playerState) {
         this.playerState = playerState;
@@ -88,6 +80,21 @@ class ChatRoom {
     }
     getMessages() {
         return this.messages;
+    }
+    startInterval() {
+        if(this.interval) {
+            clearInterval(this.interval);
+        }
+        this.interval = setInterval(() => {
+            // log(`Setting room ${this.room}'s current time to ${this.currentTime+2}`);
+            this.currentTime = this.currentTime + 2;
+        }, 2000);
+    }
+    stopInterval() {
+        if(this.interval) {
+            clearInterval(this.interval);
+            this.interval = null;
+        }
     }
 }
 

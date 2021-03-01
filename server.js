@@ -66,7 +66,7 @@ io.on('connection', socket => {
 
     /* Events related to ChatRooms */
     // Event: Client creates a room.
-    socket.on(Events.create_room, (id, callback) => {
+    socket.on(Events.create_room, (clientAlias, callback) => {
         const roomId = randomId(4);
         const roomExists = YTsyncRooms.has(roomId);
         const callbackMessage = { status: '', room: roomId, error: ''}
@@ -84,6 +84,16 @@ io.on('connection', socket => {
                 log(`#${socket.id} leaving room:${roomToLeave}`);
                 socket.join(room);
             }
+
+            const YTsyncRoom = YTsyncRooms.get(roomId);
+            if(YTsyncRoom) {
+                YTsyncRoom.setMessage(new Message(roomId, clientAlias, `${clientAlias} has created a room.`, 'welcome'));
+                const chatHistory = YTsyncRoom.getMessages();	// Get the chat rooms messages
+                const queue = YTsyncRoom.getQueue();
+                const currentVideo = YTsyncRoom.getCurrentVideo();
+                socket.emit(Events.receive_room_state, {chatHistory, queue, currentVideo});
+            }
+
             callbackMessage.status = 'ok';
         } else {
             callbackMessage.error = `Error creating room: ${roomId}`;
@@ -107,11 +117,6 @@ io.on('connection', socket => {
             const currentVideo = YTsyncRoom.getCurrentVideo();
             socket.emit(Events.receive_room_state, {chatHistory, queue, currentVideo});
             status = 'ok';
-            // if(chatHistory.length > 0) {
-            //     socket.emit(Events.receive_all_messages, chatHistory);	// Send the messages to that socket
-            // }
-            // socket.emit(Events.get_queue, queue);
-            // socket.emit(Events.get_current_video, currentVideo);
         } else {
             status = 'bad';
             errors += 'Room does not exist.';
@@ -124,12 +129,37 @@ io.on('connection', socket => {
         callback({ status:'ok'})
     })
 
+    socket.on('change name', (newName) => {
+        const oldAlias = Aliases.get(socket.id);
+        if(oldAlias && oldAlias.length > 0) {
+            if(oldAlias !== newName) {
+                log(`socket#${socket.id} changing ${oldAlias} to ${newName}`);
+                Aliases.set(socket.id, newName);
+                socket.emit(Events.assign_id, newName);
+
+                const socketRooms = sids.get(socket.id);
+                if(socketRooms) {
+                    let socketRoomsArr = [...socketRooms];
+                    socketRoomsArr = socketRoomsArr.filter(room => socket.id !== room);
+                    if(socketRoomsArr.length > 0) {
+                        const YTsyncRoom = YTsyncRooms.get(socketRoomsArr[0]);
+                        if(YTsyncRoom) {
+                            YTsyncRoom.setMessage(new Message(YTsyncRoom.room, newName, `${oldAlias} has changed their name to ${newName}.`, 'welcome'));
+                        }
+                    }
+                }
+            }
+        }
+    })
     /* Events related to clients sending messages */
 
     // Event: Client wants to send a message.
     socket.on(Events.send_message, (room, id, text) => {
         let message = new Message(room, id, text, 'chat');
-        YTsyncRooms.get(room).setMessage(message);
+        const YTsyncRoom = YTsyncRooms.get(room);
+        if(YTsyncRoom) {
+            YTsyncRoom.setMessage(message);
+        }
     });
 
     // Event: Client is typing.
@@ -140,29 +170,38 @@ io.on('connection', socket => {
     /* Events related to manipulating the queue */
     socket.on(Events.add_to_queue, (room, videoId) => {
         log(`Adding ${videoId} to queue in room: ${room}`);
-        YTsyncRooms.get(room).addToQueue(videoId);
+        const YTsyncRoom = YTsyncRooms.get(room);
+        if(YTsyncRoom) {
+            YTsyncRoom.addToQueue(videoId);
+        }
     })
     /* Events related to manipulating the video player. */
 
     // Client: Whatever time in the video it is, play the video
     socket.on(Events.player_play, (room) => {
         const YTsyncRoom = YTsyncRooms.get(room);
-        YTsyncRoom.playVideo(socket);
+        if(YTsyncRoom) {
+            YTsyncRoom.playVideo(socket);
+        }
     })
     socket.on(Events.player_play_at, (room, currentTime, playerState) => {
         const YTsyncRoom = YTsyncRooms.get(room);
-        YTsyncRoom.playVideoAt(socket, currentTime, playerState);
+        if(YTsyncRoom) {
+            YTsyncRoom.playVideoAt(socket, currentTime, playerState);
+        }
     })
     socket.on(Events.player_pause, (room, playerState) => {
         const YTsyncRoom = YTsyncRooms.get(room);
-        YTsyncRoom.pauseVideo(socket, playerState);
+        if(YTsyncRoom) {
+            YTsyncRoom.pauseVideo(socket, playerState);
+        }
     })
     socket.on(Events.player_get_status, (room, callback) => {
         const status = { currentTime:0, playerState:-1};
 
         const connectedClients = new Set([...rooms.get(room)]);
         connectedClients.delete(socket.id);
-        if(connectedClients.size > 0) {
+        if(connectedClients.size > 0 && YTsyncRooms.has(room)) {
             const YTsyncRoom = YTsyncRooms.get(room);
             const currentTime = YTsyncRoom.getCurrentTime();
             const playerState = YTsyncRoom.getPlayerState();
@@ -179,8 +218,23 @@ io.on('connection', socket => {
         log(`Setting video status from socket#${socket.id}`)
         log(`currTime: ${state.currentTime} playerState: ${state.playerState}`);
         const YTsyncRoom = YTsyncRooms.get(room);
-        YTsyncRoom.setCurrentTime(state.currentTime);
-        YTsyncRoom.setPlayerState(state.playerState);
+        if(YTsyncRoom) {
+            YTsyncRoom.setCurrentTime(state.currentTime);
+            YTsyncRoom.setPlayerState(state.playerState);            
+        }
+    })
+
+    socket.on('player start interval', (room, currentTime) => {
+        if(YTsyncRooms.has(room)) {
+            const YTsyncRoom = YTsyncRooms.get(room);
+            YTsyncRoom.startInterval(currentTime);
+        }
+    })
+    socket.on('player stop interval', (room, currentTime) => {
+        if(YTsyncRooms.has(room)) {
+            const YTsyncRoom = YTsyncRooms.get(room);
+            YTsyncRoom.stopInterval();
+        }
     })
 });
 
@@ -190,6 +244,8 @@ io.of("/").adapter.on("leave-room", (room, id) => {
     // If not, delete the room.
     const currRoom = rooms.get(room);
     if(currRoom.size === 0 && YTsyncRooms.has(room)) {
+        const YTsyncRoom = YTsyncRooms.get(room);
+        YTsyncRoom.stopInterval();
         YTsyncRooms.delete(room);
         log(`Deleting chatroom: ${room}`);
     } else if(YTsyncRooms.has(room)) {
