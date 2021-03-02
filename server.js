@@ -110,7 +110,9 @@ io.on('connection', socket => {
                 const roomToLeave = [...socketRooms][1];
                 socket.leave(roomToLeave);
                 log(`#${socket.id} leaving room:${roomToLeave}`);
-                socket.join(room);
+                if(room) {
+                    socket.join(room);
+                }
             }
 
             const YTsyncRoom = YTsyncRooms.get(roomId);
@@ -201,6 +203,8 @@ io.on('connection', socket => {
         const YTsyncRoom = YTsyncRooms.get(room);
         if(YTsyncRoom) {
             YTsyncRoom.addToQueue(videoId);
+            const clientAlias = Aliases.get(socket.id) || 'Someone';
+            YTsyncRoom.setMessage(new Message(room, clientAlias, `${clientAlias} has added a video to the queue.`, 'welcome'));
         }
     })
     /* Events related to manipulating the video player. */
