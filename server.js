@@ -28,7 +28,7 @@ if (process.env.NODE_ENV === 'production') {
         }
       });
 } else {
-    log(`NODE_ENV = ${process.env.NODE_ENV}`)
+    log(`NODE_ENV = development`)
     API_KEY = require('./apiKey');
     app = express();
     app.use(cors());
@@ -207,6 +207,17 @@ io.on('connection', socket => {
             YTsyncRoom.setMessage(new Message(room, clientAlias, `${clientAlias} has added a video to the queue.`, 'welcome'));
         }
     })
+    socket.on(Events.remove_from_queue, (room, index) => {
+        log(`Removing video#${index} from room #${room}`)
+        const YTsyncRoom = YTsyncRooms.get(room);
+        if(YTsyncRoom) {
+            YTsyncRoom.removeFromQueue(index);
+            const clientAlias = Aliases.get(socket.id) || 'Someone';
+            YTsyncRoom.setMessage(new Message(room, clientAlias, `${clientAlias} has removed a video from the queue.`, 'welcome'));
+        }
+    })
+
+
     /* Events related to manipulating the video player. */
 
     // Client: Whatever time in the video it is, play the video
@@ -242,8 +253,11 @@ io.on('connection', socket => {
         }
         callback(status);
     })
-    socket.on('player play video', videoId => {
-        log(`videoId: ${videoId}`);
+    socket.on(Events.player_load_video, (room, index) => {
+        const YTsyncRoom = YTsyncRooms.get(room);
+        if(YTsyncRoom) {
+            YTsyncRoom.loadVideo(socket, index);
+        }
     })
 
     socket.on('player set current state', (room, state) => {

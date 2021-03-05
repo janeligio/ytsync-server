@@ -19,6 +19,22 @@ class ChatRoom {
             this.io.in(this.room).emit(Events.add_to_queue, this.room, videoId);
         }
     }
+    removeFromQueue(index) {
+        const isEmpty = this.queue.length === 0;
+        const inBounds = !(index < 0) && (index < this.queue.length);
+        if(this.currentVideo === this.queue.length-1 && this.currentVideo !== 0) {
+            this.currentVideo = this.currentVideo-1;
+            this.io.in(this.room).emit(Events.get_current_video, this.currentVideo);
+        }
+
+        if(!isEmpty && inBounds) {
+            const newArray = [...this.queue.slice(0, index), ...this.queue.slice(index+1, this.queue.length)];
+            this.queue = newArray;
+            this.io.in(this.room).emit(Events.remove_from_queue, this.queue);
+        } else {
+            // log(`Room: ${this.room} Error removing video from queue`);
+        }
+    }
     getQueue() {
         return this.queue;
     }
@@ -32,7 +48,7 @@ class ChatRoom {
         this.currentTime = currentTime;
     }
     setPlayerState(state) {
-        console.log(`Setting player state:${state}`);
+        // console.log(`Setting player state:${state}`);
         this.playerState = state;
     }
     getPlayerState() {
@@ -63,6 +79,23 @@ class ChatRoom {
             currentTime: this.currentTime
         }
         socket.to(this.room).emit(Events.player_pause, data);
+    }
+    loadVideo(socket, index) {
+        // log(`Loading video#${index}`)
+        const isEmpty = this.queue.length === 0;
+        const inBounds = !(index < 0) && (index < this.queue.length);
+        const isSameVideo = index === this.currentVideo;
+
+        if(!isEmpty && inBounds && !isSameVideo) {
+            this.stopInterval();
+            this.currentVideo = index;
+            this.currentTime = 0;
+
+            socket.to(this.room).emit(Events.get_current_video, index);
+            socket.to(this.room).emit(Events.player_load_video, index);
+        } else {
+            // log(`Room: ${this.room}, Error loading video #${index}`)
+        }
     }
     setMessage(message) {
         if(message.message.length > 0) {
