@@ -1,3 +1,5 @@
 /node_modules
 apiKey.js
 package-lock.json
+.env
+dist
