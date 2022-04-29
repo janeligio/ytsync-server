@@ -18,7 +18,7 @@ import 'dotenv/config';
 import attachRoomEvents from './events/handlers/room-events';
 import attachVideoPlayerEvents from './events/handlers/video-player-events';
 
-const port = process.env.PORT || 8080;
+const port = process.env.PORT || 3001;
 
 const app: express.Application = express().use(cors());
 const server: http.Server = http.createServer(app);

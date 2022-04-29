@@ -13,6 +13,7 @@ export enum ServerToClientEventsTypes {
     playVideoAt = 'playVideoAt',
     pauseVideo = 'pauseVideo',
     loadVideo = 'loadVideo',
+    getCurrentVideo = 'getCurrentVideo',
 }
 
 /** The events declared in the `ServerToClientEvents` interface are used when sending and broadcasting events:
@@ -63,6 +64,9 @@ interface ServerToClientRoomEvents {
 
     /** Server says: Someone wants to send a message to the room. */
     receiveMessage: (message: Message) => void;
+
+    /** Server says: Someone changed the current video this index in the queue */
+    getCurrentVideo: (index: number) => void;
 }
 
 interface ServerToClientVideoPLayerEvents {

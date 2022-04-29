@@ -1,8 +1,9 @@
-import { Server } from 'socket.io';
+import { Server, Socket } from 'socket.io';
 const Events = require('../events/events');
-const { log } = require('../utility/utility.ts');
 import ClientToServerEvents from '../events/ClientToServerEvents';
-import ServerToClientEvents from '../events/ServerToClientEvents';
+import ServerToClientEvents, {
+    ServerToClientEventsTypes,
+} from '../events/ServerToClientEvents';
 import Message from './Message';
 
 enum PlayerState {
@@ -39,13 +40,16 @@ export default class ChatRoom {
         this.interval = null;
     }
 
-    addToQueue(videoId) {
+    addToQueue(videoId: string) {
         if (videoId.length > 0) {
             this.queue.push(videoId);
-            this.io.in(this.room).emit(Events.add_to_queue, this.room, videoId);
+            this.io
+                .in(this.room)
+                .emit(ServerToClientEventsTypes.addToQueue, this.room, videoId);
         }
     }
-    removeFromQueue(index) {
+
+    removeFromQueue(index: number) {
         const isEmpty = this.queue.length === 0;
         const inBounds = !(index < 0) && index < this.queue.length;
         if (
@@ -55,7 +59,10 @@ export default class ChatRoom {
             this.currentVideo = this.currentVideo - 1;
             this.io
                 .in(this.room)
-                .emit(Events.get_current_video, this.currentVideo);
+                .emit(
+                    ServerToClientEventsTypes.getCurrentVideo,
+                    this.currentVideo
+                );
         }
 
         if (!isEmpty && inBounds) {
@@ -64,57 +71,81 @@ export default class ChatRoom {
                 ...this.queue.slice(index + 1, this.queue.length),
             ];
             this.queue = newArray;
-            this.io.in(this.room).emit(Events.remove_from_queue, this.queue);
+            this.io
+                .in(this.room)
+                .emit(ServerToClientEventsTypes.removeFromQueue, this.queue);
         } else {
-            // log(`Room: ${this.room} Error removing video from queue`);
+            console.log(`Room: ${this.room} Error removing video from queue`);
         }
     }
+
     getQueue() {
         return this.queue;
     }
+
     getCurrentVideo() {
         return this.currentVideo;
     }
+
     getCurrentTime() {
         return this.currentTime;
     }
+
     setCurrentTime(currentTime) {
         this.currentTime = currentTime;
     }
-    setPlayerState(state) {
+
+    setPlayerState(playerState: PlayerState) {
         // console.log(`Setting player state:${state}`);
-        this.playerState = state;
+        this.playerState = playerState;
     }
+
     getPlayerState() {
         return this.playerState;
     }
-    playVideo(socket) {
-        this.playerState = 1;
-        const data = {
-            room: this.room,
-        };
-        socket.to(this.room).emit(Events.player_play, data);
+
+    playVideo(socket: Socket<ClientToServerEvents, ServerToClientEvents>) {
+        this.playerState = PlayerState.Playing;
+
+        socket
+            .to(this.room)
+            .emit(ServerToClientEventsTypes.playVideo, PlayerState.Playing);
     }
-    playVideoAt(socket, time, playerState) {
+
+    playVideoAt(
+        socket: Socket<ClientToServerEvents, ServerToClientEvents>,
+        time: number,
+        playerState: PlayerState
+    ) {
         this.currentTime = time;
         this.playerState = playerState;
+
         const data = {
-            room: this.room,
             currentTime: this.currentTime,
             playerState: this.playerState,
         };
-        socket.to(this.room).emit(Events.player_play_at, data);
+
+        socket.to(this.room).emit(ServerToClientEventsTypes.playVideoAt, data);
     }
-    pauseVideo(socket, playerState) {
+
+    pauseVideo(
+        socket: Socket<ClientToServerEvents, ServerToClientEvents>,
+        playerState: PlayerState
+    ) {
         this.playerState = playerState;
+
         const data = {
-            room: this.room,
             playerState: this.playerState,
             currentTime: this.currentTime,
         };
-        socket.to(this.room).emit(Events.player_pause, data);
+
+        socket.to(this.room).emit(ServerToClientEventsTypes.pauseVideo, data);
     }
-    loadVideo(socket, index) {
+
+    loadVideo(
+        socket: Socket<ClientToServerEvents, ServerToClientEvents>,
+        index: number
+    ) {
         // log(`Loading video#${index}`)
         const isEmpty = this.queue.length === 0;
         const inBounds = !(index < 0) && index < this.queue.length;
@@ -125,29 +156,40 @@ export default class ChatRoom {
             this.currentVideo = index;
             this.currentTime = 0;
 
-            socket.to(this.room).emit(Events.get_current_video, index);
-            socket.to(this.room).emit(Events.player_load_video, index);
+            socket
+                .to(this.room)
+                .emit(ServerToClientEventsTypes.getCurrentVideo, index);
+            socket
+                .to(this.room)
+                .emit(ServerToClientEventsTypes.loadVideo, index);
         } else {
-            // log(`Room: ${this.room}, Error loading video #${index}`)
+            console.log(`Room: ${this.room}, Error loading video #${index}`);
         }
     }
-    setMessage(message) {
+
+    setMessage(message: Message) {
         if (message.message.length > 0) {
             if (this.messages.length > 500) {
                 this.io.in(this.room).emit(Events.receive_message, message);
+
                 let length = this.messages.length;
                 let newer = this.messages.slice(Math.floor(length / 2), length);
+
                 this.messages = newer;
                 this.messages.push(message);
             } else {
-                this.io.in(this.room).emit(Events.receive_message, message);
+                this.io
+                    .in(this.room)
+                    .emit(ServerToClientEventsTypes.receiveMessage, message);
                 this.messages.push(message);
             }
         }
     }
+
     getMessages() {
         return this.messages;
     }
+
     startInterval() {
         if (this.interval) {
             clearInterval(this.interval);
@@ -157,6 +199,7 @@ export default class ChatRoom {
             this.currentTime = this.currentTime + 2;
         }, 2000);
     }
+
     stopInterval() {
         if (this.interval) {
             clearInterval(this.interval);
