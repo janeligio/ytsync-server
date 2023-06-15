@@ -11,6 +11,7 @@ import ClientToServerEvents, {
 import ServerToClientEvents, {
     ServerToClientEventsTypes,
 } from '../ServerToClientEvents';
+import CallBackMessage, { Status } from '../../types/CallBackMessage';
 
 /** Attaches events related to ChatRooms including:
  *
@@ -30,7 +31,11 @@ export default function attachRoomEvents(
     socket.on(ClientToServerEventsTypes.createRoom, (clientAlias, callback) => {
         const roomId = randomId(4);
         const roomExists = YTsyncRooms.has(roomId);
-        const callbackMessage = { status: '', room: roomId, error: '' };
+        const callbackMessage: CallBackMessage = {
+            status: Status.SUCCESS,
+            room: roomId,
+            error: '',
+        };
 
         if (!roomExists) {
             YTsyncRooms.set(roomId, new ChatRoom(roomId, io));
@@ -76,8 +81,9 @@ export default function attachRoomEvents(
                 });
             }
 
-            callbackMessage.status = 'ok';
+            callbackMessage.status = Status.SUCCESS;
         } else {
+            callbackMessage.status = Status.ERROR;
             callbackMessage.error = `Error creating room: ${roomId}`;
         }
         callback(callbackMessage);
@@ -85,10 +91,13 @@ export default function attachRoomEvents(
 
     // Event: Client joins an existing room.
     socket.on(ClientToServerEventsTypes.joinRoom, (room, callback) => {
-        let roomExists = YTsyncRooms.has(room);
+        const roomExists = YTsyncRooms.has(room);
         const clientAlias = Aliases.get(socket.id);
-        let status;
-        let errors = '';
+
+        const callbackMessage: CallBackMessage = {
+            status: Status.SUCCESS,
+            room,
+        };
 
         if (roomExists) {
             socket.join(room);
@@ -114,18 +123,18 @@ export default function attachRoomEvents(
                 currentVideo,
             });
 
-            status = 'ok';
+            callbackMessage.status = Status.SUCCESS;
         } else {
-            status = 'bad';
-            errors += 'Room does not exist.';
+            callbackMessage.status = Status.ERROR;
+            callbackMessage.error = 'Room does not exist.';
         }
-        callback({ status, room, errors });
+        callback(callbackMessage);
     });
 
     // Event: Client wants to leave a room.
     socket.on(ClientToServerEventsTypes.leaveRoom, (room, callback) => {
         socket.leave(room);
-        callback({ status: 'ok' });
+        callback({ status: Status.SUCCESS });
     });
 
     socket.on(ClientToServerEventsTypes.changeName, (newName) => {

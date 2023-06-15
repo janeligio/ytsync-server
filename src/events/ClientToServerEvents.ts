@@ -1,3 +1,6 @@
+import CallBackMessage from '../types/CallBackMessage';
+import VideoPlayerStatus from '../types/VideoPlayerStatus';
+
 /** Names of the events the client emits. */
 export enum ClientToServerEventsTypes {
     createRoom = 'createRoom',
@@ -17,12 +20,6 @@ export enum ClientToServerEventsTypes {
     setState = 'setState',
     startInterval = 'startInterval',
     stopInterval = 'stopInterval',
-}
-
-interface CallBackMessage {
-    status: string;
-    room?: string;
-    error?: string;
 }
 
 /** The ones declared in the `ClientToServerEvents` interface are used when receiving events:
@@ -82,11 +79,6 @@ interface ClientToServerRoomEvents {
      * @param index The index of the video in the queue
      */
     removeFromQueue: (roomId: string, index: number) => void;
-}
-
-interface VideoPlayerStatus {
-    currentTime: number;
-    playerState: number;
 }
 
 /** Client -> Server events related to YouTube video player state.
